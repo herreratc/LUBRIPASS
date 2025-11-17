@@ -11,15 +11,37 @@ class InMemoryDatabase {
     this.veiculos = new Map(); // placa => veiculo
     this.pontos = []; // movimentações
     this.trocas = [];
+    this.usuarios = new Map(); // id => usuario
+    this.recompensas = [];
+    this.resgates = [];
+    this.campanhas = [];
+    this.logs = [];
   }
 
-  seed({ postos = [], programas = [], clientes = [], veiculos = [], pontos = [], trocas = [] }) {
+  seed({
+    postos = [],
+    programas = [],
+    clientes = [],
+    veiculos = [],
+    pontos = [],
+    trocas = [],
+    usuarios = [],
+    recompensas = [],
+    resgates = [],
+    campanhas = [],
+    logs = [],
+  }) {
     postos.forEach((posto) => this.postos.set(posto.id, posto));
     programas.forEach((programa) => this.programas.set(programa.postoId, programa));
     clientes.forEach((cliente) => this.clientes.set(cliente.cpf, { ...cliente }));
     veiculos.forEach((veiculo) => this.veiculos.set(veiculo.placa, { ...veiculo }));
     this.pontos.push(...pontos);
     this.trocas.push(...trocas);
+    usuarios.forEach((usuario) => this.usuarios.set(usuario.id, { ...usuario }));
+    this.recompensas.push(...recompensas);
+    this.resgates.push(...resgates);
+    this.campanhas.push(...campanhas);
+    this.logs.push(...logs);
   }
 
   getOrCreateCliente({ cpf, nome, telefone, email }) {
@@ -41,7 +63,7 @@ class InMemoryDatabase {
     return novo;
   }
 
-  registrarMovimentacaoPontos({ clienteCpf, postoId, quantidade, tipo, origem, usuarioId }) {
+  registrarMovimentacaoPontos({ clienteCpf, postoId, quantidade, tipo, origem, usuarioId, data }) {
     const movimento = {
       id: generateId('mov'),
       clienteCpf,
@@ -50,9 +72,15 @@ class InMemoryDatabase {
       tipo,
       origem,
       usuarioId,
-      data: new Date().toISOString(),
+      data: data || new Date().toISOString(),
     };
     this.pontos.push(movimento);
+    this.registrarLog({
+      postoId,
+      tipo: origem === 'visita' ? 'geracao-pontos' : 'ajuste-pontos',
+      usuarioId,
+      payload: { clienteCpf, quantidade, origem, movimentoId: movimento.id },
+    });
     return movimento;
   }
 
@@ -97,7 +125,77 @@ class InMemoryDatabase {
       data: data || new Date().toISOString(),
     };
     this.trocas.push(troca);
+    this.registrarLog({
+      postoId,
+      tipo: 'troca-oleo',
+      usuarioId,
+      payload: { clienteCpf, veiculoPlaca, trocaId: troca.id },
+    });
     return troca;
+  }
+
+  registrarRecompensa({ postoId, nome, descricao, pontosNecessarios, status = 'ativo' }) {
+    const recompensa = {
+      id: generateId('recomp'),
+      postoId,
+      nome,
+      descricao,
+      pontosNecessarios,
+      status,
+    };
+    this.recompensas.push(recompensa);
+    return recompensa;
+  }
+
+  registrarResgate({ clienteCpf, postoId, recompensaId, usuarioId, data }) {
+    const recompensa = this.recompensas.find((rec) => rec.id === recompensaId && rec.postoId === postoId);
+    if (!recompensa) {
+      throw new Error('Recompensa não encontrada para o posto informado.');
+    }
+    const saldo = this.getSaldoCliente(clienteCpf);
+    if (saldo < recompensa.pontosNecessarios) {
+      throw new Error('Cliente não possui pontos suficientes para o resgate.');
+    }
+    const movimento = this.registrarMovimentacaoPontos({
+      clienteCpf,
+      postoId,
+      quantidade: recompensa.pontosNecessarios,
+      tipo: 'debito',
+      origem: 'resgate',
+      usuarioId,
+      data,
+    });
+    const resgate = {
+      id: generateId('resg'),
+      clienteCpf,
+      postoId,
+      recompensaId,
+      pontosGastos: recompensa.pontosNecessarios,
+      status: 'concluido',
+      usuarioId,
+      data: movimento.data,
+    };
+    this.resgates.push(resgate);
+    this.registrarLog({
+      postoId,
+      tipo: 'resgate',
+      usuarioId,
+      payload: { clienteCpf, recompensaId, resgateId: resgate.id },
+    });
+    return resgate;
+  }
+
+  registrarLog({ postoId, tipo, usuarioId, payload }) {
+    const log = {
+      id: generateId('log'),
+      postoId,
+      tipo,
+      usuarioId,
+      payload,
+      data: new Date().toISOString(),
+    };
+    this.logs.push(log);
+    return log;
   }
 
   getTrocasPorCliente(clienteCpf) {
@@ -185,6 +283,59 @@ class InMemoryDatabase {
       proximaKm,
       dataSugerida: dataSugerida.toISOString(),
     };
+  }
+
+  getClientesAtivos({ dias }) {
+    const visitas = this.getVisitasPorPeriodo({ dias });
+    return visitas.size;
+  }
+
+  getResumoPontos({ dias }) {
+    const limite = new Date();
+    limite.setDate(limite.getDate() - dias);
+    const dentroPeriodo = this.pontos.filter((mov) => new Date(mov.data) >= limite);
+    return dentroPeriodo.reduce(
+      (acc, mov) => {
+        if (mov.tipo === 'credito') {
+          acc.creditos += mov.quantidade;
+        } else {
+          acc.debitos += mov.quantidade;
+        }
+        return acc;
+      },
+      { creditos: 0, debitos: 0 }
+    );
+  }
+
+  getTrocasNoPeriodo({ dias }) {
+    const limite = new Date();
+    limite.setDate(limite.getDate() - dias);
+    return this.trocas.filter((troca) => new Date(troca.data) >= limite);
+  }
+
+  getTrocasComStatus({ diasJanela = 30 }) {
+    const agora = new Date();
+    const limiteProximas = new Date(agora);
+    limiteProximas.setDate(limiteProximas.getDate() + diasJanela);
+    return this.trocas.map((troca) => {
+      const proxima = this.calcularProximaTroca(troca);
+      const dataProxima = new Date(proxima.dataSugerida);
+      let status = 'regular';
+      if (dataProxima < agora) {
+        status = 'atrasada';
+      } else if (dataProxima <= limiteProximas) {
+        status = 'proxima';
+      }
+      return {
+        ...troca,
+        proximaTroca: proxima,
+        status,
+      };
+    });
+  }
+
+  getUsuariosPorPosto(postoId) {
+    return Array.from(this.usuarios.values()).filter((usuario) => usuario.postoId === postoId);
   }
 }
 

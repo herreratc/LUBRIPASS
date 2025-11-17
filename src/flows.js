@@ -146,9 +146,155 @@ function fluxoPainelClientesRecorrentes(db, { diasFaixas = [30, 60, 90], diasIna
   };
 }
 
+function gerarDashboard(db, { periodoDias = 30 } = {}) {
+  const totalClientes = db.clientes.size;
+  const clientesAtivos = db.getClientesAtivos({ dias: periodoDias });
+  const pontosResumo = db.getResumoPontos({ dias: periodoDias });
+  const trocasPeriodo = db.getTrocasNoPeriodo({ dias: periodoDias });
+  const ranking = db.getRankingClientes({ limite: 5 });
+
+  return {
+    periodoDias,
+    totalClientes,
+    clientesAtivos,
+    pontosConcedidos: pontosResumo.creditos,
+    pontosResgatados: pontosResumo.debitos,
+    trocasRealizadas: trocasPeriodo.length,
+    rankingTop5: ranking,
+  };
+}
+
+function paginaFidelidade(db, { postoId, periodoDias = 30 } = {}) {
+  const programa = db.programas.get(postoId);
+  if (!programa) {
+    throw new Error('Programa de fidelidade não encontrado.');
+  }
+  const limite = new Date();
+  limite.setDate(limite.getDate() - periodoDias);
+
+  const clientes = Array.from(db.clientes.values()).map((cliente) => {
+    const visitasPeriodo = db
+      .getMovimentacoesCliente(cliente.cpf, (mov) => mov.origem === 'visita' && new Date(mov.data) >= limite)
+      .length;
+    const ultimaVisitaMov = db
+      .getMovimentacoesCliente(cliente.cpf, (mov) => mov.origem === 'visita')
+      .sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+    return {
+      cpf: cliente.cpf,
+      nome: cliente.nome,
+      telefone: cliente.telefone,
+      pontos: db.getSaldoCliente(cliente.cpf),
+      visitasPeriodo,
+      ultimaVisita: ultimaVisitaMov?.data || null,
+    };
+  });
+
+  const recompensas = db.recompensas.filter((rec) => rec.postoId === postoId);
+  const historicoResgates = db.resgates
+    .filter((resg) => resg.postoId === postoId)
+    .sort((a, b) => new Date(b.data) - new Date(a.data))
+    .slice(0, 10)
+    .map((resg) => ({
+      ...resg,
+      clienteNome: db.clientes.get(resg.clienteCpf)?.nome,
+      recompensa: recompensas.find((rec) => rec.id === resg.recompensaId),
+    }));
+
+  return {
+    periodoDias,
+    programa,
+    clientes,
+    recompensas,
+    historicoResgates,
+  };
+}
+
+function paginaTrocaDeOleo(db, { postoId, filtro = 'todas', diasJanela = 30 } = {}) {
+  const trocas = db
+    .getTrocasComStatus({ diasJanela })
+    .filter((troca) => troca.postoId === postoId)
+    .filter((troca) => {
+      if (filtro === 'proximas') return troca.status === 'proxima';
+      if (filtro === 'atrasadas') return troca.status === 'atrasada';
+      return true;
+    })
+    .sort((a, b) => new Date(b.data) - new Date(a.data))
+    .map((troca) => ({
+      ...troca,
+      clienteNome: db.clientes.get(troca.clienteCpf)?.nome,
+      veiculo: db.veiculos.get(troca.veiculoPlaca),
+    }));
+
+  const totais = db
+    .getTrocasComStatus({ diasJanela })
+    .filter((troca) => troca.postoId === postoId)
+    .reduce(
+      (acc, troca) => {
+        acc[troca.status] = (acc[troca.status] || 0) + 1;
+        return acc;
+      },
+      { proxima: 0, atrasada: 0, regular: 0 }
+    );
+
+  return {
+    filtro,
+    diasJanela,
+    totais,
+    trocas,
+  };
+}
+
+function paginaClientesRecorrentes(db, options) {
+  return fluxoPainelClientesRecorrentes(db, options);
+}
+
+function paginaConfiguracoes(db, { postoId }) {
+  const programa = db.programas.get(postoId);
+  if (!programa) {
+    throw new Error('Programa não encontrado.');
+  }
+  const usuarios = db.getUsuariosPorPosto(postoId);
+  const recompensas = db.recompensas.filter((rec) => rec.postoId === postoId);
+  const campanhas = db.campanhas.filter((camp) => camp.postoId === postoId);
+
+  return {
+    programa,
+    regrasPontos: {
+      pontosPorVisita: programa.pontosPorVisita,
+      limiteDiarioPorCpf: programa.limiteDiarioPorCpf,
+      extras: programa.regrasExtras || null,
+    },
+    regrasTroca: programa.regrasTroca,
+    recompensas,
+    campanhas,
+    usuarios,
+  };
+}
+
+function fluxoResgateRecompensa(db, { clienteCpf, postoId, recompensaId, usuarioId }) {
+  const cliente = db.clientes.get(clienteCpf);
+  if (!cliente) {
+    throw new Error('Cliente não encontrado para resgate.');
+  }
+  const resgate = db.registrarResgate({ clienteCpf, postoId, recompensaId, usuarioId });
+  const saldo = db.getSaldoCliente(clienteCpf);
+  return {
+    cliente,
+    resgate,
+    saldo,
+    mensagem: 'Resgate concluído com sucesso.',
+  };
+}
+
 module.exports = {
   InMemoryDatabase,
   fluxoClienteUsaQRCode,
   fluxoTrocaDeOleo,
   fluxoPainelClientesRecorrentes,
+  gerarDashboard,
+  paginaFidelidade,
+  paginaTrocaDeOleo,
+  paginaClientesRecorrentes,
+  paginaConfiguracoes,
+  fluxoResgateRecompensa,
 };
