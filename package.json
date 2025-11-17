@@ -1,0 +1,16 @@
+{
+  "name": "lubripass",
+  "version": "1.0.0",
+  "description": "Protótipo em memória dos fluxos principais da plataforma LUBRIPASS.",
+  "main": "src/index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
