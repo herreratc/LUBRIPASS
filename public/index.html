@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LUBRIPASS • Painel</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="top-bar">
+      <div>
+        <p class="eyebrow">Protótipo em memória</p>
+        <h1>LUBRIPASS</h1>
+        <p class="subtitle">Visão consolidada dos fluxos principais</p>
+      </div>
+      <button id="refresh-button" class="primary">Atualizar</button>
+    </header>
+
+    <main>
+      <section class="status" id="status-message">
+        Carregando dados...
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Dashboard (30 dias)</h2>
+          <small id="dashboard-period"></small>
+        </div>
+        <div id="dashboard-metrics" class="grid grid-4"></div>
+      </section>
+
+      <section class="grid-layout">
+        <article>
+          <div class="section-header">
+            <h3>Top 5 clientes</h3>
+          </div>
+          <ul id="ranking-list" class="ranking-list"></ul>
+        </article>
+        <article>
+          <div class="section-header">
+            <h3>Alertas</h3>
+          </div>
+          <div id="alertas-list"></div>
+        </article>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Clientes fidelidade</h2>
+          <small>Últimas 5 entradas</small>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Pontos</th>
+                <th>Visitas (30d)</th>
+                <th>Última visita</th>
+              </tr>
+            </thead>
+            <tbody id="clientes-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-header">
+          <h2>Próximas trocas de óleo</h2>
+          <small>Janela de 90 dias</small>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Veículo</th>
+                <th>Placa</th>
+                <th>Data prevista</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="trocas-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="grid-layout">
+        <article>
+          <div class="section-header">
+            <h3>Histórico de resgates</h3>
+          </div>
+          <ul id="resgates-list" class="list"></ul>
+        </article>
+        <article>
+          <div class="section-header">
+            <h3>Configurações do programa</h3>
+          </div>
+          <div id="configuracoes"></div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>Protótipo em memória • Nenhum dado é persistido.</p>
+    </footer>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
