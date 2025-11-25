@@ -7,7 +7,7 @@ Projeto completo em React + Vite + TypeScript com backend Supabase (Auth, Postgr
 - Tailwind CSS + componentes inspirados no shadcn/ui
 - React Router, Zustand, TanStack Query
 - react-hook-form + zod
-- supabase-js v2
+- @supabase/supabase-js v2
 
 ## Estrutura
 ```
