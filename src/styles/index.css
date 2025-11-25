@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.card {
+  @apply bg-slate-900 border border-slate-800 rounded-xl shadow-lg;
+}
+
+.input {
+  @apply w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary;
+}
+
+.button {
+  @apply inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-100;
+}
+
+.table {
+  @apply min-w-full divide-y divide-slate-800;
+}
+
+.table th {
+  @apply px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400;
+}
+
+.table td {
+  @apply px-4 py-3 text-sm text-slate-100;
+}
