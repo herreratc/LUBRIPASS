@@ -118,7 +118,7 @@ create or replace function public.only_digits(text) returns text language sql im
   select regexp_replace($1, '\D', '', 'g');
 $$;
 
-create or replace function public.get_or_create_cliente(cpf_input text, placa_input text default null, estabelecimento uuid)
+create or replace function public.get_or_create_cliente(cpf_input text, estabelecimento uuid, placa_input text default null)
 returns uuid
 language plpgsql
 as $$
@@ -150,7 +150,7 @@ begin
   if exists(select 1 from limites_uso where estabelecimento_id = estabelecimento and cpf = only_digits(cpf) and data = current_date) then
     raise exception 'Limite diário já utilizado';
   end if;
-  cliente := get_or_create_cliente(cpf, placa, estabelecimento);
+  cliente := get_or_create_cliente(cpf, estabelecimento, placa);
   insert into solicitacoes (estabelecimento_id, cliente_id, servico_id, valor, status) values (estabelecimento, cliente, servico_id, valor, 'PENDENTE');
   insert into limites_uso (estabelecimento_id, cpf) values (estabelecimento, only_digits(cpf));
 end;
@@ -201,7 +201,7 @@ declare
   exp timestamp;
 begin
   select estabelecimento_id into estabelecimento from perfis where id = auth.uid();
-  cliente := get_or_create_cliente(cpf, null, estabelecimento);
+  cliente := get_or_create_cliente(cpf, estabelecimento);
   select * into premio from regras_resgate where id = premio_id;
   select coalesce(sum(quantidade),0) into saldo_atual from pontos where cliente_id = cliente;
   if saldo_atual < premio.custo_pontos then
